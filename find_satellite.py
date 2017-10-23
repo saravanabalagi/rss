@@ -20,7 +20,8 @@ def find_satellite(x, y, theta):
         slope_z = SATELLITE_Z / distance_from_satellite
         required_servo_angle = np.rad2deg(np.arctan(slope_z))
 
-        return required_bot_rotation, required_servo_angle
+        return -required_bot_rotation, required_servo_angle
         
+# print(find_satellite(0.5, 2, 90))
 print(find_satellite(1.5, 1.5, 45))
-print("169.40847225202862, 48.018699563443406")
+# print("169.40847225202862, 48.018699563443406")

@@ -6,9 +6,15 @@ THRESHOLD_SONAR = 19
 THRESHOLD_LIGHT = 100
 THRESHOLD_IR = 200
 
-SATELLITE_X = 0.69
+SATELLITE_X = -0.69
 SATELLITE_Y = 0.00
 SATELLITE_Z = 2.95
+
+CURRENT_BOT_X = 1.5
+CURRENT_BOT_Y = 1.5
+CURRENT_BOT_THETA = 45
+
+TIME_TO_ROTATE_ONE_DEGREE = 0.026
 
 import time
 import numpy as np
@@ -27,9 +33,11 @@ class Toddler:
     # Move where space is available
     def move(self):
 
+        # get both ir values
         ir_left = self.analog[1]
         ir_right = self.analog[2]
 
+        # find if blocked or not
         l = ir_left <= THRESHOLD_IR
         r = ir_right <= THRESHOLD_IR
 
@@ -52,12 +60,38 @@ class Toddler:
         if l and r:
             self.IO.setMotors(100, -100)
 
-    def rotate(self, degrees):
+    # rotate bot to specific angle
+    # 38.5 degrees observed per second ~= 0.026s per degree
+    def rotate_bot(self, degrees):
+
+        # do not rotate if zero
         if degrees == 0: return
+
+        # rotate clockwise if degrees more than 0
         if degrees >= 0: self.IO.setMotors(-100, 100)
+
+        # rotate counter-clockwise if degrees is less than 0
         else: self.IO.setMotors(100, -100)
-        time.sleep(3)
+
+        # sustain rotation
+        time.sleep(TIME_TO_ROTATE_ONE_DEGREE * abs(degrees))
+        self.IO.setMotors(0, 0)
+
         return
+
+    # rotate servo
+    def rotate_servo(self, degrees):
+
+        # lock in position
+        self.IO.servoEngage()
+
+        # rotate and send status
+        self.IO.servoSet(degrees)
+        print("Servo Activated... Setting", degrees, "degrees")
+
+        # sustain
+        time.sleep(60)
+
 
     # x and y distance from deployment base
     # theta is angle from deployment base, 0 pointing east
@@ -77,7 +111,7 @@ class Toddler:
         slope_z = SATELLITE_Z / distance_from_satellite
         required_servo_angle = np.rad2deg(np.arctan(slope_z))
 
-        return required_bot_rotation, required_servo_angle
+        return -required_bot_rotation, required_servo_angle
 
     # This is a callback that will be called repeatedly.
     # It has its dedicated thread so you can keep block it.
@@ -99,22 +133,41 @@ class Toddler:
             # Print sensor data to console
             print(self.analog, self.digital)
 
-            # Emergency stop on mot
-            if self.digital[6]: self.emergency_stop = not self.emergency_stop
-            if self.emergency_stop: self.IO.setMotors(0, 0)
+            # # ---------------------------------------------------- # #
+            # #  Milestone Part 3, Point to satellite to send data   # #
+            # #  Uncomment to make it work                           # #
+            # #  Comment Everything else below                       # #
+            # # ---------------------------------------------------- # #
 
-            # Stop on POI
-            elif self.analog[3] > THRESHOLD_LIGHT:
-                self.IO.setMotors(0, 0)
-                time.sleep(10)
+            # rotate_bot, rotate_servo = self.find_satellite(CURRENT_BOT_X, CURRENT_BOT_Y, CURRENT_BOT_THETA)
+            # print(rotate_bot, rotate_servo)
+            # self.rotate_bot(rotate_bot)
+            # self.rotate_servo(rotate_servo)
 
-            # turn or reverse when sonor is blocked
-            elif self.analog[0] > THRESHOLD_SONAR or self.digital[0] or self.digital[1]:
-                self.move()
+            # # ____________________________________________________ # #
+            # # ---------------------------------------------------- # #
 
-            # keep going forward otherwise
-            else:
-                self.IO.setMotors(100,100)
+            # self.IO.setMotors(-100, -100)
+            # time.sleep(10)
+            # self.IO.setMotors(0,0)
+            # time.sleep(100)
+
+            # # Emergency stop on mot
+            # if self.digital[6]: self.emergency_stop = not self.emergency_stop
+            # if self.emergency_stop: self.IO.setMotors(0, 0)
+            #
+            # # Stop on POI
+            # elif self.analog[3] > THRESHOLD_LIGHT:
+            #     self.IO.setMotors(0, 0)
+            #     time.sleep(10)
+            #
+            # # turn or reverse when sonar is blocked
+            # elif self.analog[0] > THRESHOLD_SONAR or self.digital[0] or self.digital[1]:
+            #     self.move()
+            #
+            # # keep going forward otherwise
+            # else:
+            #     self.IO.setMotors(100, 100)
 
                 # if mot[0] != motPrev[0] or mot[1] != motPrev[1]:
                 #     speed = self.move(mot[0], mot[1])
@@ -153,7 +206,7 @@ class Toddler:
                     self.IO.cameraGrab()
                 img = self.IO.cameraRead()
                 print("Picture taken...")
-                if img.__class__ == numpy.ndarray:
+                if img.__class__ == np.ndarray:
                     hasImage = True
                     cv2.imwrite('camera-' + datetime.datetime.now().isoformat() + '.png', img)
                     self.IO.imshow('window', img)
