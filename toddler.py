@@ -2,13 +2,13 @@
 __TODDLER_VERSION__ = "1.0.0"
 
 # Constants
-THRESHOLD_SONAR = 19
+THRESHOLD_SONAR = 29
 THRESHOLD_LIGHT = 100
-THRESHOLD_IR = 200
+THRESHOLD_IR = 250
 
 CURRENT_BOT_X = 1.5
 CURRENT_BOT_Y = 1.5
-CURRENT_BOT_THETA = 45
+CURRENT_BOT_THETA = 90
 
 # DO NOT CHANGE THESE
 TIME_TO_ROTATE_ONE_DEGREE = 0.026
@@ -93,7 +93,6 @@ class Toddler:
         # sustain
         time.sleep(60)
 
-
     # x and y distance from deployment base
     # theta is angle from deployment base, 0 pointing east
     def find_satellite(self, x, y, theta):
@@ -148,50 +147,53 @@ class Toddler:
             # # ____________________________________________________ # #
             # # ---------------------------------------------------- # #
 
+            # DO NOT UNCOMMENT:
+            # FOR DEBUGGING MOTORS ONLY
+            # Run straight for 10 seconds
             # self.IO.setMotors(-100, -100)
             # time.sleep(10)
             # self.IO.setMotors(0,0)
             # time.sleep(100)
 
-            # # Emergency stop on mot
-            # if self.digital[6]: self.emergency_stop = not self.emergency_stop
-            # if self.emergency_stop: self.IO.setMotors(0, 0)
-            #
-            # # Stop on POI
-            # elif self.analog[3] > THRESHOLD_LIGHT:
-            #     self.IO.setMotors(0, 0)
-            #     time.sleep(10)
-            #
-            # # turn or reverse when sonar is blocked
-            # elif self.analog[0] > THRESHOLD_SONAR or self.digital[0] or self.digital[1]:
-            #     self.move()
-            #
-            # # keep going forward otherwise
-            # else:
-            #     self.IO.setMotors(100, 100)
+            # Emergency stop on mot
+            if self.digital[6]: self.emergency_stop = not self.emergency_stop
+            if self.emergency_stop: self.IO.setMotors(0, 0)
 
-                # if mot[0] != motPrev[0] or mot[1] != motPrev[1]:
-                #     speed = self.move(mot[0], mot[1])
-                #     self.IO.setMotors(-speed[0], speed[1])
-                #     if mot[0]:
-                #         self.IO.setStatus('on')
-                #     else:
-                #         self.IO.setStatus('off')
-                #     if mot[1]:
-                #         self.IO.setError('on')
-                #     else:
-                #         self.IO.setError('off')
-                # if mot[2]:
-                #     self.IO.servoEngage()
-                #     # pos=(pos+3)%360
-                #     # self.IO.servoSet(abs(pos-180))
-                #     self.IO.servoSet(30)
-                #     print("Servo Activated...")
-                # if mot[2] != motPrev[2] and not mot[2]:
-                #     self.IO.servoDisengage()
-                # motPrev[0] = mot[0]
-                # motPrev[1] = mot[1]
-                # motPrev[2] = mot[2]
+            # Stop on POI
+            elif self.analog[3] > THRESHOLD_LIGHT:
+                self.IO.setMotors(0, 0)
+                time.sleep(10)
+
+            # turn or reverse when sonar is blocked
+            elif self.analog[0] > THRESHOLD_SONAR or self.digital[0] or self.digital[1]:
+                self.move()
+
+            # keep going forward otherwise
+            else:
+                self.IO.setMotors(100, 100)
+
+            # if mot[0] != motPrev[0] or mot[1] != motPrev[1]:
+            #     speed = self.move(mot[0], mot[1])
+            #     self.IO.setMotors(-speed[0], speed[1])
+            #     if mot[0]:
+            #         self.IO.setStatus('on')
+            #     else:
+            #         self.IO.setStatus('off')
+            #     if mot[1]:
+            #         self.IO.setError('on')
+            #     else:
+            #         self.IO.setError('off')
+            # if mot[2]:
+            #     self.IO.servoEngage()
+            #     # pos=(pos+3)%360
+            #     # self.IO.servoSet(abs(pos-180))
+            #     self.IO.servoSet(30)
+            #     print("Servo Activated...")
+            # if mot[2] != motPrev[2] and not mot[2]:
+            #     self.IO.servoDisengage()
+            # motPrev[0] = mot[0]
+            # motPrev[1] = mot[1]
+            # motPrev[2] = mot[2]
 
     # This is a callback that will be called repeatedly.
     # It has its dedicated thread so you can keep block it.
