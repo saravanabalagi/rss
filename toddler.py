@@ -21,6 +21,7 @@ import time
 import numpy as np
 import cv2
 import datetime
+from line import Line
 
 # Hardware test code
 class Toddler:
@@ -107,7 +108,7 @@ class Toddler:
             else: required_bot_rotation += 360
 
         # finding required servo angle
-        distance_from_satellite = np.sqrt((y - SATELLITE_Y)**2 + (x - SATELLITE_X)**2)
+        distance_from_satellite = np.sqrt(((y - SATELLITE_Y)**2) + ((x - SATELLITE_X)**2))
         slope_z = SATELLITE_Z / distance_from_satellite
         required_servo_angle = np.rad2deg(np.arctan(slope_z))
 
@@ -195,6 +196,30 @@ class Toddler:
             # motPrev[1] = mot[1]
             # motPrev[2] = mot[2]
 
+    def get_edges(img):
+        edges = cv2.Canny(img, THRESHOLD_1, THRESHOLD_2)
+        edges = cv2.GaussianBlur(edges,(GAUSSIAN_THRESHOLD_1,GAUSSIAN_THRESHOLD_2),0)
+        return edges
+
+    def convert_to_lines(lines):
+        new_lines = []
+        for line in lines:
+            if np.array(line[0]).shape[0] == 4: valid_line = line[0]
+            elif np.array(line[0]).shape[1] == 4: valid_line = line[0][0]
+            new_lines.append(Line(valid_line))
+        return new_lines
+
+    def get_largest_line_and_image_with_lines_drawn(img, edges):
+        largest_line = Line([0,0,0,0])
+        lines = cv2.HoughLinesP(edges, 1, np.pi/180, 100, np.array([]), MIN_LINE_LENGTH, MAX_LINE_GAP)
+        if lines is None: return largest_line, img
+        lines = self.convert_to_lines(lines)
+        for line in lines: 
+            cv2.line(img, line.point_1(), line.point_2(), (255,0,0), LINE_THICKNESS)
+            if(line.length() > largest_line.length()):
+                largest_line = line
+        return largest_line, img
+
     # This is a callback that will be called repeatedly.
     # It has its dedicated thread so you can keep block it.
     def Vision(self, OK):
@@ -216,6 +241,8 @@ class Toddler:
                     self.IO.setStatus('flash', cnt=2)
                     time.sleep(0.5)
             if hasImage:
+                line, img = self.get_largest_line_and_image_with_lines_drawn
+                print(line.inclination())
                 self.IO.imshow('window', img)
 
             sw = self.digital[5]
