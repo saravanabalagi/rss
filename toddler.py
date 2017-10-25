@@ -10,8 +10,23 @@ CURRENT_BOT_X = 1.5
 CURRENT_BOT_Y = 1.5
 CURRENT_BOT_THETA = 90
 
+THRESHOLD_1 = 100
+THRESHOLD_2 = 100
+GAUSSIAN_KERNEL_SIZE = 11       # needs to be odd
+GAUSSIAN_SIGMA = 1
+
+MIN_LINE_LENGTH = 100
+NEAR_VERTICAL_ANG_DIFF = 20
+SKIP_BOTTOM_THRESHOLD = 20
+MAX_LINE_GAP = 20
+LINE_THICKNESS = 1
+PRIME_LINE_THICKNESS = 5
+THRESHOLD_INTERCEPT_FOR_SIMILARITY = 10
+THRESHOLD_INCLINATION_FOR_SIMILARITY = 10
+
 # DO NOT CHANGE THESE
 TIME_TO_ROTATE_ONE_DEGREE = 0.026
+# TIME_TO_ROTATE_ONE_DEGREE = 0.023
 
 SATELLITE_X = -0.69
 SATELLITE_Y = 0.00
@@ -31,6 +46,9 @@ class Toddler:
         self.digital = [0, 0, 0, 0, 0, 0, 0, 0]
         self.analog = [0, 0, 0, 0, 0, 0, 0, 0]
         self.emergency_stop = False
+        self.degrees_for_alignment = 999
+        self.is_aligned = False
+        self.cam_ready = False
 
     # Move where space is available
     def move(self):
@@ -70,10 +88,12 @@ class Toddler:
         if degrees == 0: return
 
         # rotate clockwise if degrees more than 0
-        if degrees >= 0: self.IO.setMotors(-100, 100)
+        if degrees >= 0:
+            self.IO.setMotors(-100, 100)
 
         # rotate counter-clockwise if degrees is less than 0
-        else: self.IO.setMotors(100, -100)
+        else:
+            self.IO.setMotors(100, -100)
 
         # sustain rotation
         time.sleep(TIME_TO_ROTATE_ONE_DEGREE * abs(degrees))
@@ -104,11 +124,13 @@ class Toddler:
 
         # optimize angle
         if abs(required_bot_rotation) > 180:
-            if required_bot_rotation > 0: required_bot_rotation -= 360
-            else: required_bot_rotation += 360
+            if required_bot_rotation > 0:
+                required_bot_rotation -= 360
+            else:
+                required_bot_rotation += 360
 
         # finding required servo angle
-        distance_from_satellite = np.sqrt(((y - SATELLITE_Y)**2) + ((x - SATELLITE_X)**2))
+        distance_from_satellite = np.sqrt(((y - SATELLITE_Y) ** 2) + ((x - SATELLITE_X) ** 2))
         slope_z = SATELLITE_Z / distance_from_satellite
         required_servo_angle = np.rad2deg(np.arctan(slope_z))
 
@@ -123,7 +145,6 @@ class Toddler:
         # pos = 180
 
         while OK():
-
             # Read once in every 0.05s
             time.sleep(0.05)
 
@@ -156,22 +177,48 @@ class Toddler:
             # self.IO.setMotors(0,0)
             # time.sleep(100)
 
-            # Emergency stop on mot
-            if self.digital[6]: self.emergency_stop = not self.emergency_stop
-            if self.emergency_stop: self.IO.setMotors(0, 0)
+            # UNCOMMENT ME:
 
-            # Stop on POI
-            elif self.analog[3] > THRESHOLD_LIGHT:
-                self.IO.setMotors(0, 0)
-                time.sleep(10)
+            self.rotate_bot(90)
+            time.sleep(10)
+            self.rotate_bot(90)
+            time.sleep(10)
+            self.rotate_bot(180)
+            time.sleep(10)
+            self.rotate_bot(180)
+            time.sleep(10)
+            self.rotate_bot(360)
+            time.sleep(10)
+            self.rotate_bot(360)
+            time.sleep(120)
+            # if self.cam_ready and not self.is_aligned:
+            #     if self.degrees_for_alignment == 999:
+            #         print("Didn't find any line, rotating bot...")
+            #         self.rotate_bot(45)
+            #     else:
+            #         print("Aligning robot")
+            #         self.rotate_bot(self.degrees_for_alignment)
+            #         self.is_aligned = True
+            #         print(self.degrees_for_alignment, "degrees aligned")
+            #         print("Alignment complete")
+            #         self.degrees_for_alignment = 999
 
-            # turn or reverse when sonar is blocked
-            elif self.analog[0] > THRESHOLD_SONAR or self.digital[0] or self.digital[1]:
-                self.move()
-
-            # keep going forward otherwise
-            else:
-                self.IO.setMotors(100, 100)
+            # # Emergency stop on mot
+            # if self.digital[6]: self.emergency_stop = not self.emergency_stop
+            # if self.emergency_stop: self.IO.setMotors(0, 0)
+            #
+            # # Stop on POI
+            # elif self.analog[3] > THRESHOLD_LIGHT:
+            #     self.IO.setMotors(0, 0)
+            #     time.sleep(10)
+            #
+            # # turn or reverse when sonar is blocked
+            # elif self.analog[0] > THRESHOLD_SONAR or self.digital[0] or self.digital[1]:
+            #     self.move()
+            #
+            # # keep going forward otherwise
+            # else:
+            #     self.IO.setMotors(100, 100)
 
             # if mot[0] != motPrev[0] or mot[1] != motPrev[1]:
             #     speed = self.move(mot[0], mot[1])
@@ -196,53 +243,117 @@ class Toddler:
             # motPrev[1] = mot[1]
             # motPrev[2] = mot[2]
 
-    def get_edges(img):
+    def get_edges(self, img):
+        img = cv2.GaussianBlur(img, (GAUSSIAN_KERNEL_SIZE, GAUSSIAN_KERNEL_SIZE), GAUSSIAN_SIGMA)
         edges = cv2.Canny(img, THRESHOLD_1, THRESHOLD_2)
-        edges = cv2.GaussianBlur(edges,(GAUSSIAN_THRESHOLD_1,GAUSSIAN_THRESHOLD_2),0)
         return edges
 
-    def convert_to_lines(lines):
+    def convert_to_lines(self, lines):
         new_lines = []
         for line in lines:
-            if np.array(line[0]).shape[0] == 4: valid_line = line[0]
-            elif np.array(line[0]).shape[1] == 4: valid_line = line[0][0]
+            if np.array(line[0]).shape[0] == 4:
+                valid_line = line[0]
+            elif np.array(line[0]).shape[1] == 4:
+                valid_line = line[0][0]
             new_lines.append(Line(valid_line))
         return new_lines
 
-    def get_largest_line_and_image_with_lines_drawn(img, edges):
-        largest_line = Line([0,0,0,0])
-        lines = cv2.HoughLinesP(edges, 1, np.pi/180, 100, np.array([]), MIN_LINE_LENGTH, MAX_LINE_GAP)
-        if lines is None: return largest_line, img
+    def eliminate_lines(self, lines):
+        new_lines = []
+        for line in lines:
+            if line.y1 > 400:
+                if line.y2 > 400:
+                    continue
+            if abs(line.slope()) > np.tan(np.radians(90-NEAR_VERTICAL_ANG_DIFF)):
+                continue
+            new_lines.append(line)
+        return new_lines
+
+    def combine_lines(self, lines):
+        duplicate = np.zeros(len(lines))
+        duplicate.fill(-1)
+        for index, line in enumerate(lines):
+            for c_index, c_line in enumerate(lines):
+                if c_index == index: continue
+                if duplicate[c_index] != -1: continue
+                if abs(line.intercept() - c_line.intercept()) < THRESHOLD_INTERCEPT_FOR_SIMILARITY:
+                    if abs(line.inclination() - c_line.inclination()) < THRESHOLD_INCLINATION_FOR_SIMILARITY:
+                        duplicate[index] = index
+                        duplicate[c_index] = index
+        new_lines = [lines[index] for index, i in enumerate(duplicate) if i == -1]
+        for index in set(duplicate):
+            if index == -1: continue
+            duplicate_lines = [lines[i] for i, x in enumerate(duplicate) if x == index]
+            new_lines.append(Line.combine(duplicate_lines))
+        return new_lines
+
+    def get_largest_line_and_image_with_lines_drawn(self, img):
+
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+        largest_line = Line([0, 0, 0, 0])
+        edges = self.get_edges(img)
+        lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 100, np.array([]), MIN_LINE_LENGTH, MAX_LINE_GAP)
+
+        if lines is None: print("No lines"); return None, img
+
         lines = self.convert_to_lines(lines)
-        for line in lines: 
-            cv2.line(img, line.point_1(), line.point_2(), (255,0,0), LINE_THICKNESS)
-            if(line.length() > largest_line.length()):
+        lines = self.combine_lines(lines)
+        lines = self.eliminate_lines(lines)
+
+        for line in lines:
+            cv2.line(img, line.point_1(), line.point_2(), (255, 0, 0), LINE_THICKNESS)
+            if line.length() > largest_line.length():
                 largest_line = line
+        cv2.line(img, largest_line.point_1(), largest_line.point_2(), (0, 0, 255), PRIME_LINE_THICKNESS)
         return largest_line, img
+
+    def get_degrees_for_bot_alignment(self, largest_line_inclination):
+        # print("Line incl",largest_line_inclination)
+        if abs(largest_line_inclination) <= 45: degrees = -1 * np.sign(largest_line_inclination) * abs(largest_line_inclination)
+        else: degrees = np.sign(largest_line_inclination) * (90 - abs(largest_line_inclination))
+        # print("Result",degrees)
+        return degrees
 
     # This is a callback that will be called repeatedly.
     # It has its dedicated thread so you can keep block it.
     def Vision(self, OK):
-        self.IO.cameraSetResolution('low')
+
+        # 800 x 600 resolution
+        self.IO.cameraSetResolution('high')
+
         hasImage = False
         res = 0
         sw = False
         swPrev = False
         while OK():
-            if self.digital[4]:
-                for i in range(0, 5):
-                    self.IO.cameraGrab()
-                img = self.IO.cameraRead()
+            # if not self.initial_orientation:
+            if self.degrees_for_alignment == 999 and self.is_aligned is False:
+
+                self.cam_ready = False
+                # for i in range(0, 5):
+                self.IO.cameraGrab()
+                temp_img = self.IO.cameraRead()
+                temp_img = cv2.cvtColor(temp_img, cv2.COLOR_RGB2GRAY)
+                line, img = self.get_largest_line_and_image_with_lines_drawn(temp_img)
+
+                if line is None:
+                    print("No line found")
+                    self.degrees_for_alignment = 999
+                else:
+                    self.degrees_for_alignment = self.get_degrees_for_bot_alignment(line.inclination())
+                    print("Line found", self.degrees_for_alignment)
+                self.cam_ready = True
+
                 print("Picture taken...")
+
                 if img.__class__ == np.ndarray:
                     hasImage = True
                     cv2.imwrite('camera-' + datetime.datetime.now().isoformat() + '.png', img)
                     self.IO.imshow('window', img)
                     self.IO.setStatus('flash', cnt=2)
                     time.sleep(0.5)
+
             if hasImage:
-                line, img = self.get_largest_line_and_image_with_lines_drawn
-                print(line.inclination())
                 self.IO.imshow('window', img)
 
             sw = self.digital[5]
