@@ -1,7 +1,7 @@
 #!/bin/sh
 USERNAME="student"
 PASSWORD="password"
-SERVER="Hypena"
+SERVER="Gallinula"
 # Directory where file is located
 DIR="."
 #  Filename of backup file to be transfered
