@@ -86,13 +86,3 @@ def get_largest_line_and_image_with_lines_drawn(img):
             largest_line = line
     cv2.line(img, largest_line.point_1(), largest_line.point_2(), (0, 0, 255), PRIME_LINE_THICKNESS)
     return largest_line, img
-
-
-# calculate how much bot needs to turn for the given line
-def get_degrees_for_bot_alignment(largest_line_inclination):
-
-    # print("Line incl",largest_line_inclination)
-    if abs(largest_line_inclination) <= 45: degrees = -1 * np.sign(largest_line_inclination) * abs(largest_line_inclination)
-    else: degrees = np.sign(largest_line_inclination) * (90 - abs(largest_line_inclination))
-    # print("Result",degrees)
-    return degrees
