@@ -1,17 +1,20 @@
 #!/usr/bin/env python
+MAX_WAIT_TIME_FOR_CAMERA_FOR_ALIGNMENT = 5
 __TODDLER_VERSION__ = "1.0.0"
 
 # Constants
 THRESHOLD_SONAR = 29
-# THRESHOLD_LIGHT = 40
-THRESHOLD_LIGHT = 300 # For Debugging only
+THRESHOLD_LIGHT = 40
+# THRESHOLD_SONAR = 5 # For Debugging only
+# THRESHOLD_LIGHT = 40 # For Debugging only
 THRESHOLD_IR = 275
 THRESHOLD_IR_STANDALONE = 425
+POI_COOLDOWN_DISTANCE = 0.50
 
 # DO NOT CHANGE THESE
 # TIME_TO_ROTATE_ONE_DEGREE = 0.029
-TIME_TO_ROTATE_ONE_DEGREE = 0.04
-REVOLUTIONS_PER_ONE_DEGREE = 0.10
+TIME_TO_ROTATE_ONE_DEGREE = 0.03        # for battery voltage 13.11V
+REVOLUTIONS_PER_ONE_DEGREE = 0.11
 REVOLUTIONS_PER_ONE_CM = 0.10
 
 # Imports
@@ -32,13 +35,19 @@ class Toddler:
         self.digital = [0, 0, 0, 0, 0, 0, 0, 0]
         self.analog = [0, 0, 0, 0, 0, 0, 0, 0]
         self.emergency_stop = False
+
+        # vision
         self.degrees_for_alignment = 999
-        self.is_aligned = False
+        self.is_aligned = True
         self.cam_ready = False
 
-        self.x = 0
-        self.y = 0
-        self.theta = 0
+        # poi
+        self.poi_count = 0
+        self.poi_locations = np.zeros((4,2))
+
+        self.x = -0.53
+        self.y = 0.84
+        self.theta = 90
 
     # This is a callback that will be called repeatedly.
     # It has its dedicated thread so you can keep block it.
@@ -61,7 +70,7 @@ class Toddler:
             self.analog = self.IO.getSensors()
 
             # Print sensor data to console
-            # print(self.analog, self.digital)
+            print(self.analog, self.digital)
 
             # # ---------------------------------------------------- # #
             # #  Milestone Part 3, Point to satellite to send data   # #
@@ -81,16 +90,21 @@ class Toddler:
             # FOR DEBUGGING MOTORS ONLY
 
             # # Run straight for 10 seconds
+            # self.rotate_servo(45)
+            # time.sleep(5)
+            # self.reset_servo()
+            # time.sleep(100)
             # self.IO.setMotors(-100, -100)
             # time.sleep(5)
             # self.IO.setMotors(0, 0)
             # time.sleep(50)
 
             # Check if rotations are right
-            # self.rotate_bot_rev(9)
-            # time.sleep(10)
-            # self.rotate_bot(20)
-            # time.sleep(10)
+            # time.sleep(5)
+            self.rotate_bot(180)
+            time.sleep(5)
+            self.rotate_bot(-180)
+            time.sleep(1000)
             # self.rotate_bot(45)
             # time.sleep(10)
             # self.rotate_bot(90)
@@ -102,65 +116,64 @@ class Toddler:
 
             # UNCOMMENT ME:
 
-            # # Emergency stop on mot
-            # if self.digital[6]:
-            #     print("Emergency Pressed: ", True)
-            #     self.emergency_stop = not self.emergency_stop
-            # if self.emergency_stop:
-            #     print("Emergency Stop: ", True)
-            #     self.IO.setMotors(0, 0)
-            # if not self.emergency_stop:
-            #     if self.cam_ready and not self.is_aligned:
-            #         if self.degrees_for_alignment == 999:
-            #             print("Didn't find any line, rotating bot...")
-            #             self.rotate_bot(45)
-            #         else:
-            #             print("Aligning robot")
-            #             print(self.degrees_for_alignment, "to be aligned")
-            #             self.rotate_bot(self.degrees_for_alignment)
-            #             self.is_aligned = True
-            #             print("Alignment complete")
-            #             time.sleep(5)
-            #             self.degrees_for_alignment = 999
+            # Stop on POI and Do not detect POI if already detected
+            # if not self.is_near_known_poi() and self.analog[3] > THRESHOLD_LIGHT:
             #
-            #     if self.is_aligned:
-
-            # Stop on POI
-            if self.analog[3] > THRESHOLD_LIGHT:
-                self.IO.setMotors(0, 0)
-
-            # turn or reverse when sonar is blocked
-            elif self.analog[0] < THRESHOLD_SONAR or self.digital[0] or self.digital[1]:
-                # self.IO.setMotors(0, 0)
-                self.move()
-
-            # check if the bot is getting too close to the walls on both side, when sonar is clear
-            elif self.analog[1] > THRESHOLD_IR_STANDALONE or self.analog[2] > THRESHOLD_IR_STANDALONE:
-                if self.analog[1] > THRESHOLD_IR_STANDALONE:
-                    self.rotate_bot(15)
-                else:
-                    self.rotate_bot(-15)
-
-            # keep going forward otherwise
-            else:
-                if cycle >= 6:
-                    self.IO.setMotors(0,0)
-                    rotate_bot, rotate_servo = find_satellite(self.x, self.y, self.theta)
-                    print(rotate_bot, rotate_servo)
-                    self.rotate_bot(rotate_bot)
-                    self.rotate_servo(rotate_servo)
-                else:
-                    self.IO.setMotors(-100, -100)
-                    hall_current = self.digital[-1]
-                    if hall_current != hall_prev:
-                        hall_prev = hall_current
-                        forward_revolutions += 1
-            if forward_revolutions >= 5:
-                self.x += 13.5 * np.cos(np.radians(self.theta)) / 100
-                self.y += 13.5 * np.sin(np.radians(self.theta)) / 100
-                forward_revolutions %= 5
-                cycle += 1
-                print("Cycle:",cycle, "X: ", self.x, "Y: ", self.y)
+            #     # set POI detected flag and stop motors
+            #     # self.poi_detected_at = time.time()
+            #     print("POI Detected at", self.x, self.y)
+            #     self.poi_count += 1
+            #     self.poi_locations[self.poi_count] = [self.x, self.y]
+            #     self.IO.setMotors(0, 0)
+            #     time.sleep(5)
+            #
+            #     # do the math and rotate bot and set servo
+            #     rotate_bot, rotate_servo = find_satellite(self.x, self.y, self.theta)
+            #     print(rotate_bot, rotate_servo)
+            #     self.rotate_bot(rotate_bot)
+            #     self.rotate_servo(rotate_servo)
+            #
+            #     # wait for 10 seconds and reset bot orientation and servo
+            #     time.sleep(10)
+            #     self.rotate_bot(-rotate_bot)
+            #     self.reset_servo()
+            #
+            # # # turn or reverse when sonar is blocked
+            # # elif self.analog[0] < THRESHOLD_SONAR or self.digital[0] or self.digital[1]:
+            # #     print("Sonar activated")
+            # #     # self.IO.setMotors(0, 0)
+            # #     self.move()
+            # #
+            # # # check if the bot is getting too close to the walls on both side, when sonar is clear
+            # # elif self.analog[1] > THRESHOLD_IR_STANDALONE or self.analog[2] > THRESHOLD_IR_STANDALONE:
+            # #     if self.analog[1] > THRESHOLD_IR_STANDALONE:
+            # #         print("IR Left Activated")
+            # #         self.rotate_bot(15)
+            # #     else:
+            # #         print("IR Right Activated")
+            # #         self.rotate_bot(-15)
+            #
+            # # keep going forward otherwise
+            # else:
+            #     # # Debugging code
+            #     # if cycle >= 6:
+            #     #     self.IO.setMotors(0,0)
+            #     #     rotate_bot, rotate_servo = find_satellite(self.x, self.y, self.theta)
+            #     #     print(rotate_bot, rotate_servo)
+            #     #     self.rotate_bot(rotate_bot)
+            #     #     self.rotate_servo(rotate_servo)
+            #     # else:
+            #         self.IO.setMotors(-100, -100)
+            #         hall_current = self.digital[-1]
+            #         if hall_current != hall_prev:
+            #             hall_prev = hall_current
+            #             forward_revolutions += 1
+            # if forward_revolutions >= 5:
+            #     self.x += 13.5 * np.cos(np.radians(self.theta)) / 100
+            #     self.y += 13.5 * np.sin(np.radians(self.theta)) / 100
+            #     forward_revolutions %= 5
+            #     cycle += 1
+            #     print("Cycle:",cycle, "X: ", self.x, "Y: ", self.y)
 
     # This is a callback that will be called repeatedly.
     # It has its dedicated thread so you can keep block it.
@@ -253,41 +266,6 @@ class Toddler:
                 self.rotate_bot(-90)
             else: self.rotate_bot(90)
 
-    def rotate_bot_rev(self, req_revs):
-
-        print("Rotation initiated for", req_revs, "revs")
-
-        # do not rotate if zero
-        if req_revs == 0: return
-
-        # rotate clockwise if degrees more than 0
-        if req_revs >= 0:
-            self.IO.setMotors(-100, 100)
-
-        # rotate counter-clockwise if degrees is less than 0
-        else:
-            self.IO.setMotors(100, -100)
-
-        # sustain rotation
-        revolutions = 0
-        rotation_done = False
-        hall_prev = self.digital[-1]
-        while not rotation_done:
-            hall_current = self.digital[-1]
-            if hall_current != hall_prev:
-                hall_prev = hall_current
-                revolutions += 1
-                print(revolutions)
-
-            if req_revs <= revolutions:
-                rotation_done = True
-
-        print("Rotation complete for", req_revs, "revs")
-        # time.sleep((TIME_TO_ROTATE_ONE_DEGREE - abs(degrees)/float(360) * 0.015) * abs(degrees))
-        self.IO.setMotors(0, 0)
-
-        return
-
     # rotate bot to specific angle using hall sensor
     def rotate_bot(self, degrees):
 
@@ -298,31 +276,67 @@ class Toddler:
 
         # rotate clockwise if degrees more than 0
         if degrees >= 0:
-            self.IO.setMotors(-100, 100)
+            self.IO.setMotors(100, -100)
+            time.sleep((TIME_TO_ROTATE_ONE_DEGREE - abs(degrees)/float(360) * 0.015) * abs(degrees))
 
         # rotate counter-clockwise if degrees is less than 0
         else:
-            self.IO.setMotors(100, -100)
+            self.IO.setMotors(-100, 100)
+            time.sleep((TIME_TO_ROTATE_ONE_DEGREE - abs(degrees)/float(360) * 0.015) * abs(degrees) * 0.9)
+
+        # # sustain rotation
+        # revolutions = 0
+        # rotation_done = False
+        # hall_prev = False
+        # while not rotation_done:
+        #     hall_current = self.digital[-1]
+        #     if hall_current != hall_prev180:
+        #         hall_prev = hall_current
+        #         revolutions += 1
+        #         print(revolutions)
+        #
+        #     if revolutions >= round(abs(degrees) * REVOLUTIONS_PER_ONE_DEGREE):
+        #         rotation_done = True
 
         # sustain rotation
-        revolutions = 0
-        rotation_done = False
-        hall_prev = False
-        while not rotation_done:
-            hall_current = self.digital[-1]
-            if hall_current != hall_prev:
-                hall_prev = hall_current
-                revolutions += 1
-                print(revolutions)
-
-            if degrees * REVOLUTIONS_PER_ONE_DEGREE < revolutions:
-                rotation_done = True
-
-        print("Rotation complete for", degrees, "degrees")
         # time.sleep((TIME_TO_ROTATE_ONE_DEGREE - abs(degrees)/float(360) * 0.015) * abs(degrees))
+        print("Rotation complete for", degrees, "degrees")
+
+        # stop motors
+        self.IO.setMotors(0, 0)
+
+        # align bot to nearest 90 if rotated 90 degrees
+        if abs(degrees) == 90:
+            self.is_aligned = False
+            start = time.time()
+            while self.cam_ready is False:
+                time.sleep(0.05)
+                if time.time() - start > MAX_WAIT_TIME_FOR_CAMERA_FOR_ALIGNMENT:
+                    break
+
+            if self.degrees_for_alignment < 45:
+                print("Aligning robot")
+                print(self.degrees_for_alignment, "to be aligned")
+                self.rotate_bot(self.degrees_for_alignment)
+                self.is_aligned = True
+                print("Alignment complete")
+                self.degrees_for_alignment = 999
+
+            else:
+                if self.degrees_for_alignment == 999: print("No line found")
+                else:
+                    print("\n\n")
+                    print("Error")
+                    print("Degrees for alignment", self.degrees_for_alignment)
+                    print("\n\n")
+
+                self.is_aligned = True
+                self.degrees_for_alignment = 999
+                print("Skipping alignment")
+
+        # update current orientation
         self.theta += degrees
         self.theta %= 360
-        self.IO.setMotors(0, 0)
 
         return
 
@@ -333,9 +347,22 @@ class Toddler:
         self.IO.servoEngage()
 
         # rotate and send status
-        self.IO.servoSet(degrees - 5)
-        print("Servo Activated... Setting", degrees, "degrees")
+        self.IO.servoSet(degrees)
+        print("\n\nServo Activated")
+        print("Setting", degrees, "degrees")
+        print("\n")
 
-        # sustain
-        time.sleep(60)
+    # reset servo
+    def reset_servo(self):
 
+        # set servo back to zero
+        self.IO.servoEngage()
+        self.IO.servoSet(0)
+        print("\n\nSetting zero degrees")
+
+    def is_near_known_poi(self):
+        diff = np.abs(self.poi_locations - [self.x, self.y])
+        min_diff = np.min(diff, axis=0)
+        if np.max(min_diff) < POI_COOLDOWN_DISTANCE:
+            return True
+        return False
