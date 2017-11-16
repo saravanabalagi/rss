@@ -111,9 +111,9 @@ class Toddler:
 
             # Check if rotations are right
             # time.sleep(5)
-            # self.rotate_bot(180)
+            # self.rotate_bot(90)
             # time.sleep(5)
-            # self.rotate_bot(-180)
+            # self.rotate_bot(-90)
             # time.sleep(1000)
             # self.rotate_bot(45)
             # time.sleep(10)
@@ -360,7 +360,7 @@ class Toddler:
             return True
         return False
 
-    def align_bot_using_camera(self):
+    def align_bot_using_camera(self, force=True):
         self.is_aligned = False
         start = time.time()
         while self.cam_ready is False:
@@ -377,7 +377,10 @@ class Toddler:
             self.degrees_for_alignment = 999
 
         else:
-            if self.degrees_for_alignment == 999: print("No line found")
+            if self.degrees_for_alignment == 999:
+                # self.rotate_bot(-10, update_theta=False)
+                # self.align_bot_using_camera()
+                print("No line found")
             else:
                 print("\n\n")
                 print("Error")
