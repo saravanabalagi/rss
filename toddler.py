@@ -13,8 +13,11 @@ SERVO_OFFSET = -15
 IR_COOLDOWN_TIME = 1
 MAX_WAIT_TIME_FOR_CAMERA_FOR_ALIGNMENT = 5
 
+# Values from line fitting observations
 CLOCKWISE_M = 26.92747252747253
 CLOCKWISE_B = -4.549450549450569
+ANTICLOCKWISE_M = 30.729670329670327
+ANTICLOCKWISE_B = -10.55054945054951
 
 # DO NOT CHANGE THESE
 # TIME_TO_ROTATE_ONE_DEGREE = 0.029
@@ -107,16 +110,16 @@ class Toddler:
             # time.sleep(5)
             # self.reset_servo()
             # time.sleep(100)
-            # self.IO.setMotors(100, -100)
+            # self.IO.setMotors(-100, 100)
             # time.sleep(7)
             # self.IO.setMotors(0, 0)
             # time.sleep(1000)
 
             # Check if rotations are right
             # time.sleep(5)
-            self.rotate_bot(10)
-            time.sleep(1000)
             # self.rotate_bot(-90)
+            # time.sleep(10)
+            # self.rotate_bot(-120)
             # time.sleep(1000)
             # self.rotate_bot(45)
             # time.sleep(10)
@@ -297,13 +300,14 @@ class Toddler:
         # rotate clockwise if degrees more than 0
         if degrees >= 0:
             self.IO.setMotors(100, -100)
+            time.sleep((abs(degrees) - CLOCKWISE_B)/CLOCKWISE_M)
             # time.sleep((TIME_TO_ROTATE_ONE_DEGREE - abs(degrees)/float(360) * 0.015) * abs(degrees))
-            time.sleep((degrees - CLOCKWISE_B)/CLOCKWISE_M)
 
         # rotate counter-clockwise if degrees is less than 0
         else:
             self.IO.setMotors(-100, 100)
-            time.sleep((TIME_TO_ROTATE_ONE_DEGREE - abs(degrees)/float(360) * 0.015) * abs(degrees) * 0.8)
+            time.sleep((abs(degrees) - ANTICLOCKWISE_B)/ANTICLOCKWISE_M)
+            # time.sleep((TIME_TO_ROTATE_ONE_DEGREE - abs(degrees)/float(360) * 0.015) * abs(degrees) * 0.8)
 
         # # sustain rotation
         # revolutions = 0
@@ -327,8 +331,8 @@ class Toddler:
         self.IO.setMotors(0, 0)
 
         # align bot to nearest 90 if rotated 90 degrees
-        if abs(degrees) == 90:
-            self.align_bot_using_camera()
+        # if abs(degrees) == 90:
+            # self.align_bot_using_camera()
 
         # update current orientation
         if update_theta:
