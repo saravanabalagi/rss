@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-MAX_WAIT_TIME_FOR_CAMERA_FOR_ALIGNMENT = 5
 __TODDLER_VERSION__ = "1.0.0"
 
 # Constants
@@ -7,13 +6,16 @@ THRESHOLD_SONAR = 29
 THRESHOLD_LIGHT = 40
 # THRESHOLD_SONAR = 5 # For Debugging only
 # THRESHOLD_LIGHT = 40 # For Debugging only
-THRESHOLD_IR = 275
-THRESHOLD_IR_STANDALONE = 425
+THRESHOLD_IR = 250
+THRESHOLD_IR_STANDALONE = 350
 POI_COOLDOWN_DISTANCE = 0.50
+SERVO_OFFSET = -15
+IR_COOLDOWN_TIME = 3
+MAX_WAIT_TIME_FOR_CAMERA_FOR_ALIGNMENT = 5
 
 # DO NOT CHANGE THESE
 # TIME_TO_ROTATE_ONE_DEGREE = 0.029
-TIME_TO_ROTATE_ONE_DEGREE = 0.03        # for battery voltage 13.11V
+TIME_TO_ROTATE_ONE_DEGREE = 0.035        # for battery voltage 13.11V
 REVOLUTIONS_PER_ONE_DEGREE = 0.11
 REVOLUTIONS_PER_ONE_CM = 0.10
 
@@ -36,6 +38,10 @@ class Toddler:
         self.analog = [0, 0, 0, 0, 0, 0, 0, 0]
         self.emergency_stop = False
         self.sonar = [0, 0, 0, 0, 0]
+
+        self.ir_left = [0, 0, 0, 0, 0]
+        self.ir_right = [0, 0, 0, 0, 0]
+        self.ir_last_detected_at = 0
 
         # vision
         self.degrees_for_alignment = 999
@@ -73,6 +79,8 @@ class Toddler:
             # Print sensor data to console
             print(self.analog, self.digital, [self.x, self.y, self.theta])
             self.sonar = self.sonar[1:] + [self.analog[0]]
+            self.ir_left = self.ir_left[1:] + [self.analog[1]]
+            self.ir_right = self.ir_right[1:] + [self.analog[2]]
 
             # # ---------------------------------------------------- # #
             # #  Milestone Part 3, Point to satellite to send data   # #
@@ -103,9 +111,9 @@ class Toddler:
 
             # Check if rotations are right
             # time.sleep(5)
-            # self.rotate_bot(10)
+            # self.rotate_bot(90)
             # time.sleep(5)
-            # self.rotate_bot(-10)
+            # self.rotate_bot(-90)
             # time.sleep(1000)
             # self.rotate_bot(45)
             # time.sleep(10)
@@ -141,19 +149,24 @@ class Toddler:
                 self.reset_servo()
 
             # turn or reverse when sonar is blocked
-            elif (self.analog[0] < THRESHOLD_SONAR and abs(self.sonar[-1] - np.mean(self.sonar[:-1])) <= 15) or self.digital[0] or self.digital[1]:
+            elif (self.analog[0] < THRESHOLD_SONAR and abs(self.sonar[-1] - np.mean(self.sonar[:-1])) <= 15) \
+                    or self.digital[0] or self.digital[1]:
                 print("Sonar activated")
                 # self.IO.setMotors(0, 0)
                 self.move()
 
-            # # check if the bot is getting too close to the walls on both side, when sonar is clear
-            # elif self.analog[1] > THRESHOLD_IR_STANDALONE or self.analog[2] > THRESHOLD_IR_STANDALONE:
-            #     if self.analog[1] > THRESHOLD_IR_STANDALONE:
-            #         print("IR Left Activated")
-            #         self.rotate_bot(15)
-            #     else:
-            #         print("IR Right Activated")
-            #         self.rotate_bot(-15)
+            # check if the bot is getting too close to the walls on both side, when sonar is clear
+            elif time.time() - self.ir_last_detected_at > IR_COOLDOWN_TIME and \
+                    ((self.analog[1] > THRESHOLD_IR_STANDALONE and np.sum(np.array(self.ir_left[1:]) - np.array(self.ir_left[:-1])) > len(self.ir_left))
+                    or (self.analog[2] > THRESHOLD_IR_STANDALONE and np.sum(np.array(self.ir_right[1:]) - np.array(self.ir_right[:-1])) > len(self.ir_right))):
+                if self.analog[1] > THRESHOLD_IR_STANDALONE:
+                    print("IR Left Activated")
+                    self.rotate_bot(15)
+                    self.ir_last_detected_at = time.time()
+                else:
+                    print("IR Right Activated")
+                    self.rotate_bot(-15)
+                    self.ir_last_detected_at = time.time()
 
             # keep going forward otherwise
             else:
@@ -264,10 +277,10 @@ class Toddler:
 
         # if both left and right are available
         if not l and not r:
-            # if randint(0, 9) > 5:
-            #     self.rotate_bot(-90)
-            # else: self.rotate_bot(90)
-            self.rotate_bot(-90)
+            if randint(0, 9) > 5:
+                self.rotate_bot(-90)
+            else: self.rotate_bot(90)
+            # self.rotate_bot(-90)
 
     # rotate bot to specific angle using hall sensor
     def rotate_bot(self, degrees, update_theta=True):
@@ -285,7 +298,7 @@ class Toddler:
         # rotate counter-clockwise if degrees is less than 0
         else:
             self.IO.setMotors(-100, 100)
-            time.sleep((TIME_TO_ROTATE_ONE_DEGREE - abs(degrees)/float(360) * 0.015) * abs(degrees) * 0.9)
+            time.sleep((TIME_TO_ROTATE_ONE_DEGREE - abs(degrees)/float(360) * 0.015) * abs(degrees) * 0.8)
 
         # # sustain rotation
         # revolutions = 0
@@ -351,7 +364,7 @@ class Toddler:
         self.IO.servoEngage()
 
         # rotate and send status
-        self.IO.servoSet(degrees)
+        self.IO.servoSet(degrees + SERVO_OFFSET)
         print("\n\nServo Activated")
         print("Setting", degrees, "degrees")
         print("\n")
