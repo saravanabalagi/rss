@@ -13,6 +13,9 @@ SERVO_OFFSET = -15
 IR_COOLDOWN_TIME = 1
 MAX_WAIT_TIME_FOR_CAMERA_FOR_ALIGNMENT = 5
 
+CLOCKWISE_M = 26.92747252747253
+CLOCKWISE_B = -4.549450549450569
+
 # DO NOT CHANGE THESE
 # TIME_TO_ROTATE_ONE_DEGREE = 0.029
 TIME_TO_ROTATE_ONE_DEGREE = 0.04        # for battery voltage 13.11V
@@ -104,15 +107,15 @@ class Toddler:
             # time.sleep(5)
             # self.reset_servo()
             # time.sleep(100)
-            # self.IO.setMotors(-100, -100)
-            # time.sleep(5)
+            # self.IO.setMotors(100, -100)
+            # time.sleep(7)
             # self.IO.setMotors(0, 0)
-            # time.sleep(50)
+            # time.sleep(1000)
 
             # Check if rotations are right
             # time.sleep(5)
-            # self.rotate_bot(90)
-            # time.sleep(5)
+            self.rotate_bot(10)
+            time.sleep(1000)
             # self.rotate_bot(-90)
             # time.sleep(1000)
             # self.rotate_bot(45)
@@ -294,7 +297,8 @@ class Toddler:
         # rotate clockwise if degrees more than 0
         if degrees >= 0:
             self.IO.setMotors(100, -100)
-            time.sleep((TIME_TO_ROTATE_ONE_DEGREE - abs(degrees)/float(360) * 0.015) * abs(degrees))
+            # time.sleep((TIME_TO_ROTATE_ONE_DEGREE - abs(degrees)/float(360) * 0.015) * abs(degrees))
+            time.sleep((degrees - CLOCKWISE_B)/CLOCKWISE_M)
 
         # rotate counter-clockwise if degrees is less than 0
         else:
@@ -375,10 +379,11 @@ class Toddler:
             self.is_aligned = True
             print("Alignment complete")
             self.degrees_for_alignment = 999
+            time.sleep(1)
 
         else:
             if self.degrees_for_alignment == 999:
-                # self.rotate_bot(-10, update_theta=False)
+                # self.rotate_bot(-20, update_theta=False)
                 # self.align_bot_using_camera()
                 print("No line found")
             else:
@@ -390,3 +395,4 @@ class Toddler:
             self.is_aligned = True
             self.degrees_for_alignment = 999
             print("Skipping alignment")
+

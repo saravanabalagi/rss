@@ -29,5 +29,5 @@ def find_satellite(x, y, theta):
         return -required_bot_rotation, required_servo_angle
 
 if __name__ == "__main__":
-    print(find_satellite(0,0,0))
-    # print(find_satellite(0.36, 3.22, 270))
+    # print(find_satellite(0,0,0))
+    print(find_satellite(0.36, 3.22, 270))
