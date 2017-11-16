@@ -14,10 +14,14 @@ IR_COOLDOWN_TIME = 1
 MAX_WAIT_TIME_FOR_CAMERA_FOR_ALIGNMENT = 5
 
 # Values from line fitting observations
-CLOCKWISE_M = 26.92747252747253
-CLOCKWISE_B = -4.549450549450569
-ANTICLOCKWISE_M = 30.729670329670327
-ANTICLOCKWISE_B = -10.55054945054951
+# CLOCKWISE_M = 26.92747252747253
+# CLOCKWISE_B = -4.549450549450569
+CLOCKWISE_M = 29.242197802197808 # high
+CLOCKWISE_B = -7.1868131868133105 # high
+# ANTICLOCKWISE_M = 30.729670329670327
+# ANTICLOCKWISE_B = -10.55054945054951
+ANTICLOCKWISE_M = 29.57758241758242 # high
+ANTICLOCKWISE_B = 0.5197802197801593 # high
 
 # DO NOT CHANGE THESE
 # TIME_TO_ROTATE_ONE_DEGREE = 0.029
@@ -110,14 +114,14 @@ class Toddler:
             # time.sleep(5)
             # self.reset_servo()
             # time.sleep(100)
-            # self.IO.setMotors(-100, 100)
-            # time.sleep(7)
-            # self.IO.setMotors(0, 0)
-            # time.sleep(1000)
+            self.IO.setMotors(100, -100)
+            time.sleep(7.0)
+            self.IO.setMotors(0, 0)
+            time.sleep(1000)
 
             # Check if rotations are right
             # time.sleep(5)
-            # self.rotate_bot(-90)
+            # self.rotate_bot(-180)
             # time.sleep(10)
             # self.rotate_bot(-120)
             # time.sleep(1000)
@@ -331,8 +335,8 @@ class Toddler:
         self.IO.setMotors(0, 0)
 
         # align bot to nearest 90 if rotated 90 degrees
-        # if abs(degrees) == 90:
-            # self.align_bot_using_camera()
+        if abs(degrees) == 90:
+            self.align_bot_using_camera()
 
         # update current orientation
         if update_theta:
