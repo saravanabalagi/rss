@@ -10,12 +10,12 @@ THRESHOLD_IR = 250
 THRESHOLD_IR_STANDALONE = 350
 POI_COOLDOWN_DISTANCE = 0.50
 SERVO_OFFSET = -15
-IR_COOLDOWN_TIME = 3
+IR_COOLDOWN_TIME = 1
 MAX_WAIT_TIME_FOR_CAMERA_FOR_ALIGNMENT = 5
 
 # DO NOT CHANGE THESE
 # TIME_TO_ROTATE_ONE_DEGREE = 0.029
-TIME_TO_ROTATE_ONE_DEGREE = 0.035        # for battery voltage 13.11V
+TIME_TO_ROTATE_ONE_DEGREE = 0.04        # for battery voltage 13.11V
 REVOLUTIONS_PER_ONE_DEGREE = 0.11
 REVOLUTIONS_PER_ONE_CM = 0.10
 
@@ -111,9 +111,9 @@ class Toddler:
 
             # Check if rotations are right
             # time.sleep(5)
-            # self.rotate_bot(90)
+            # self.rotate_bot(180)
             # time.sleep(5)
-            # self.rotate_bot(-90)
+            # self.rotate_bot(-180)
             # time.sleep(1000)
             # self.rotate_bot(45)
             # time.sleep(10)
@@ -147,6 +147,7 @@ class Toddler:
                 time.sleep(10)
                 self.rotate_bot(-rotate_bot)
                 self.reset_servo()
+                self.align_bot_using_camera()
 
             # turn or reverse when sonar is blocked
             elif (self.analog[0] < THRESHOLD_SONAR and abs(self.sonar[-1] - np.mean(self.sonar[:-1])) <= 15) \
@@ -161,11 +162,11 @@ class Toddler:
                     or (self.analog[2] > THRESHOLD_IR_STANDALONE and np.sum(np.array(self.ir_right[1:]) - np.array(self.ir_right[:-1])) > len(self.ir_right))):
                 if self.analog[1] > THRESHOLD_IR_STANDALONE:
                     print("IR Left Activated")
-                    self.rotate_bot(15)
+                    self.rotate_bot(30)
                     self.ir_last_detected_at = time.time()
                 else:
                     print("IR Right Activated")
-                    self.rotate_bot(-15)
+                    self.rotate_bot(-30)
                     self.ir_last_detected_at = time.time()
 
             # keep going forward otherwise
@@ -277,10 +278,10 @@ class Toddler:
 
         # if both left and right are available
         if not l and not r:
-            if randint(0, 9) > 5:
-                self.rotate_bot(-90)
-            else: self.rotate_bot(90)
-            # self.rotate_bot(-90)
+            # if randint(0, 9) > 5:
+            #     self.rotate_bot(-90)
+            # else: self.rotate_bot(90)
+            self.rotate_bot(-90)
 
     # rotate bot to specific angle using hall sensor
     def rotate_bot(self, degrees, update_theta=True):
@@ -323,32 +324,7 @@ class Toddler:
 
         # align bot to nearest 90 if rotated 90 degrees
         if abs(degrees) == 90:
-            self.is_aligned = False
-            start = time.time()
-            while self.cam_ready is False:
-                time.sleep(0.05)
-                if time.time() - start > MAX_WAIT_TIME_FOR_CAMERA_FOR_ALIGNMENT:
-                    break
-
-            if self.degrees_for_alignment < 45:
-                print("Aligning robot")
-                print(self.degrees_for_alignment, "to be aligned")
-                self.rotate_bot(self.degrees_for_alignment, update_theta=False)
-                self.is_aligned = True
-                print("Alignment complete")
-                self.degrees_for_alignment = 999
-
-            else:
-                if self.degrees_for_alignment == 999: print("No line found")
-                else:
-                    print("\n\n")
-                    print("Error")
-                    print("Degrees for alignment", self.degrees_for_alignment)
-                    print("\n\n")
-
-                self.is_aligned = True
-                self.degrees_for_alignment = 999
-                print("Skipping alignment")
+            self.align_bot_using_camera()
 
         # update current orientation
         if update_theta:
@@ -383,3 +359,31 @@ class Toddler:
         if np.max(min_diff) < POI_COOLDOWN_DISTANCE:
             return True
         return False
+
+    def align_bot_using_camera(self):
+        self.is_aligned = False
+        start = time.time()
+        while self.cam_ready is False:
+            time.sleep(0.05)
+            if time.time() - start > MAX_WAIT_TIME_FOR_CAMERA_FOR_ALIGNMENT:
+                break
+
+        if self.degrees_for_alignment < 45:
+            print("Aligning robot")
+            print(self.degrees_for_alignment, "to be aligned")
+            self.rotate_bot(self.degrees_for_alignment, update_theta=False)
+            self.is_aligned = True
+            print("Alignment complete")
+            self.degrees_for_alignment = 999
+
+        else:
+            if self.degrees_for_alignment == 999: print("No line found")
+            else:
+                print("\n\n")
+                print("Error")
+                print("Degrees for alignment", self.degrees_for_alignment)
+                print("\n\n")
+
+            self.is_aligned = True
+            self.degrees_for_alignment = 999
+            print("Skipping alignment")
